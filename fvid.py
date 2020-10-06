@@ -148,7 +148,7 @@ def make_image(bit_set, resolution=(1920, 1080)):
 
 def split_list_by_n(lst, n):
     for i in range(0, len(lst), n):
-        yield lst[i : i + n]
+        yield lst[i: i + n]
 
 
 def make_image_sequence(bitstring, resolution=(1920, 1080)):
@@ -211,6 +211,32 @@ def make_video(output_filepath, image_sequence):
         ).output(output_filepath, vcodec="libx264rgb").run(quiet=True)
 
 
+def get_output_path(args):
+    setup(args.output)
+    return args.output
+
+def encode(args):
+    # get bits from file
+    bits = get_bits_from_file(args.input)
+
+    # create image sequence
+    image_sequence = make_image_sequence(bits)
+
+    # save images
+    for index in range(len(image_sequence)):
+        image_sequence[index].save(
+            f"{FRAMES_DIR}encoded_frames_{index}.png"
+        )
+
+    make_video("%s/file.mp4" % get_output_path(args), image_sequence)
+
+
+def decode(args):
+    bits = get_bits_from_video(args.input)
+
+    save_bits_to_file(get_output_path(args), bits)
+
+
 def cleanup():
     # remove frames
     import shutil
@@ -218,62 +244,32 @@ def cleanup():
     shutil.rmtree(FRAMES_DIR)
 
 
-def setup():
+def setup(directory=FRAMES_DIR):
     import os
 
-    if not os.path.exists(FRAMES_DIR):
-        os.makedirs(FRAMES_DIR)
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="save files as videos")
+    parser.add_argument("action", help="encode file as video, or decode file from video",
+                        choices=("encode", "decode"))
+    parser.add_argument("-i", "--input", help="input file", required=True)
+    parser.add_argument("-o", "--output", help="output path", default="./")
+
+    return parser.parse_args()
+
+
+def main():
+    args = parse_args()
+    print(args)
+    setup()
+    try:
+        globals()[args.action](args)
+    finally:
+        cleanup()
 
 
 if __name__ == "__main__":
-
-    parser = argparse.ArgumentParser(description="save files as videos")
-    parser.add_argument(
-        "-e", "--encode", help="encode file as video", action="store_true"
-    )
-    parser.add_argument(
-        "-d", "--decode", help="decode file from video", action="store_true"
-    )
-
-    parser.add_argument("-i", "--input", help="input file", required=True)
-    parser.add_argument("-o", "--output", help="output path")
-
-    args = parser.parse_args()
-
-    setup()
-
-    if args.decode:
-        bits = get_bits_from_video(args.input)
-
-        file_path = ""
-
-        if args.output:
-            file_path = args.output
-        else:
-            file_path = "./"
-
-        save_bits_to_file("./", bits)
-
-    elif args.encode:
-        # get bits from file
-        bits = get_bits_from_file(args.input)
-
-        # create image sequence
-        image_sequence = make_image_sequence(bits)
-
-        # save images
-        for index in range(len(image_sequence)):
-            image_sequence[index].save(
-                f"{FRAMES_DIR}encoded_frames_{index}.png"
-            )
-
-        video_file_path = ""
-
-        if args.output:
-            video_file_path = args.output
-        else:
-            video_file_path = "./file.mp4"
-
-        make_video(video_file_path, image_sequence)
-
-    cleanup()
+    main()
